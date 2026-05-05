@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  background: #f4f8f8;
+  color: #17202a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 140, 149, 0.09), rgba(249, 115, 22, 0.035) 38%, rgba(244, 248, 248, 1) 88%),
+    #f4f8f8;
+  color: #17202a;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(0, 140, 149, 0.18);
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+.field {
+  @apply h-11 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-river focus:bg-white focus:ring-4 focus:ring-river/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+}
+
+textarea.field,
+select[multiple].field {
+  @apply h-auto;
+}
+
+.label {
+  @apply text-xs font-bold uppercase tracking-normal text-slate-600;
+}
+
+.btn {
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply btn bg-river text-white shadow-sm hover:-translate-y-0.5 hover:bg-cyan-800 hover:shadow-lift active:translate-y-0;
+}
+
+.btn-secondary {
+  @apply btn border border-line bg-white text-ink shadow-sm hover:-translate-y-0.5 hover:border-river/35 hover:bg-cyan-50 hover:text-river active:translate-y-0;
+}
+
+.btn-danger {
+  @apply btn bg-ember text-white shadow-sm hover:-translate-y-0.5 hover:bg-red-800 hover:shadow-lg active:translate-y-0;
+}
+
+.surface {
+  @apply rounded-xl border border-line/90 bg-white/95 shadow-soft backdrop-blur;
+}
+
+.table-head {
+  @apply border-b border-line bg-slate-50/90 text-left text-xs font-bold uppercase tracking-normal text-slate-600;
+}
+
+.table-cell {
+  @apply border-b border-line/80 px-4 py-3.5 text-sm text-slate-800;
+}
+
+.table-cell:first-child,
+.table-head th:first-child {
+  @apply pl-5;
+}
+
+.table-cell:last-child,
+.table-head th:last-child {
+  @apply pr-5;
+}
+
+@media (max-width: 767px) {
+  main,
+  section,
+  article,
+  form,
+  table,
+  thead,
+  tbody,
+  tr,
+  th,
+  td {
+    max-width: 100%;
+  }
+
+  .surface {
+    @apply rounded-lg;
+  }
+
+  .overflow-x-auto {
+    overflow-x: visible;
+  }
+
+  .surface table {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .surface thead {
+    display: none;
+  }
+
+  .surface tbody,
+  .surface tr,
+  .surface td {
+    display: block;
+    width: 100%;
+  }
+
+  .surface tbody {
+    padding: 0.75rem;
+  }
+
+  .surface tbody tr {
+    margin: 0.75rem;
+    overflow: hidden;
+    border: 1px solid #d9e6e8;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  }
+
+  .surface tbody tr:hover {
+    background: #ffffff;
+  }
+
+  .table-cell {
+    border-bottom: 1px solid rgba(217, 230, 232, 0.82);
+    padding: 0.8rem 0.95rem;
+  }
+
+  .table-cell[data-label] {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+  }
+
+  .table-cell[data-label]::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.35;
+    text-transform: uppercase;
+  }
+
+  .table-cell:first-child,
+  .table-head th:first-child,
+  .table-cell:last-child,
+  .table-head th:last-child {
+    padding-left: 0.95rem;
+    padding-right: 0.95rem;
+  }
+
+  .surface tbody tr > .table-cell:last-child {
+    border-bottom: 0;
+  }
+
+  .surface [class*='min-w-'] {
+    min-width: 0 !important;
+  }
+
+  .surface p,
+  .surface span,
+  .surface a,
+  .surface td,
+  .surface dd {
+    overflow-wrap: anywhere;
+  }
+
+  .surface .btn,
+  .surface .btn-primary,
+  .surface .btn-secondary,
+  .surface .btn-danger {
+    min-height: 2.5rem;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .field {
+    min-width: 0;
+  }
+}
