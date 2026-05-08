@@ -12,7 +12,7 @@ import { TourTabs } from '@/components/tour-tabs';
 import { apiFetch, dateText, money } from '@/lib/api';
 import { useSessionGuard } from '@/lib/hooks';
 import { bnLabel, categoryLabel } from '@/lib/i18n';
-import type { Expense, TourMember } from '@/lib/types';
+import type { Expense, TourMember, User } from '@/lib/types';
 
 const categories = ['Food', 'Hotel', 'Transport', 'Ticket', 'Fuel', 'Shopping', 'Emergency', 'Other'];
 const schema = z.object({
@@ -55,7 +55,16 @@ export default function ExpensesPage() {
     queryFn: () => apiFetch<Expense[]>(`/tours/${tourId}/expenses`),
     enabled: ready && Boolean(session && tourId),
   });
+  const { data: admins = [] } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => apiFetch<User[]>('/users?role=ADMIN'),
+    enabled: ready && Boolean(session?.user.role === 'ADMIN'),
+  });
   const activeMembers = useMemo(() => members.filter((member) => member.isActive), [members]);
+  const adminOptions = useMemo(
+    () => admins.filter((admin) => admin.status !== 'INACTIVE'),
+    [admins],
+  );
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -122,9 +131,12 @@ export default function ExpensesPage() {
   useEffect(() => {
     if (activeMembers.length && addSelectedIds.length === 0) {
       setAddSelectedIds(activeMembers.map((member) => member.userId));
-      form.setValue('paidById', activeMembers[0].userId);
     }
-  }, [activeMembers, addSelectedIds.length, form]);
+
+    if (adminOptions.length && !form.getValues('paidById')) {
+      form.setValue('paidById', adminOptions[0].id);
+    }
+  }, [activeMembers, addSelectedIds.length, adminOptions, form]);
 
   if (!ready || !session) {
     return null;
@@ -165,6 +177,16 @@ export default function ExpensesPage() {
 
       return { ...current, memberIds };
     });
+  }
+
+  function setAllEditMembers() {
+    setEditDraft((current) =>
+      current ? { ...current, memberIds: editableMembers(current.memberIds).map((member) => member.userId) } : current,
+    );
+  }
+
+  function clearEditMembers() {
+    setEditDraft((current) => (current ? { ...current, memberIds: [] } : current));
   }
 
   function editableMembers(memberIds: string[]) {
@@ -237,9 +259,9 @@ export default function ExpensesPage() {
             <input className="field" min="0" placeholder="টাকার পরিমাণ" step="0.01" type="number" {...form.register('amount')} />
             <select className="field" {...form.register('paidById')}>
               <option value="">কে পেমেন্ট করেছে</option>
-              {members.map((member) => (
-                <option key={member.userId} value={member.userId}>
-                  {member.user.name}
+              {adminOptions.map((admin) => (
+                <option key={admin.id} value={admin.id}>
+                  {admin.name}
                 </option>
               ))}
             </select>
@@ -294,7 +316,7 @@ export default function ExpensesPage() {
 
             {addMutation.error ? <p className="text-sm text-ember lg:col-span-4">{addMutation.error.message}</p> : null}
 
-            <button className="btn-primary lg:col-span-4" disabled={addMutation.isPending || addSelectedIds.length === 0} type="submit">
+            <button className="btn-primary lg:col-span-4" disabled={addMutation.isPending || addSelectedIds.length === 0 || adminOptions.length === 0} type="submit">
               <ReceiptText size={18} aria-hidden="true" />
               {addMutation.isPending ? 'সেভ হচ্ছে...' : 'খরচ সেভ করুন'}
             </button>
@@ -373,9 +395,9 @@ export default function ExpensesPage() {
                           value={editDraft.paidById}
                           onChange={(event) => updateDraft('paidById', event.target.value)}
                         >
-                          {members.map((member) => (
-                            <option key={member.userId} value={member.userId}>
-                              {member.user.name}
+                          {adminOptions.map((admin) => (
+                            <option key={admin.id} value={admin.id}>
+                              {admin.name}
                             </option>
                           ))}
                         </select>
@@ -415,6 +437,16 @@ export default function ExpensesPage() {
                     <td className="table-cell" data-label="মেম্বার">
                       {isEditing ? (
                         <div className="min-w-64 space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            <button className="btn-secondary" type="button" onClick={setAllEditMembers}>
+                              <CheckSquare size={16} aria-hidden="true" />
+                              সবাই সিলেক্ট
+                            </button>
+                            <button className="btn-secondary" type="button" onClick={clearEditMembers}>
+                              <Square size={16} aria-hidden="true" />
+                              ক্লিয়ার
+                            </button>
+                          </div>
                           <div className="grid gap-2">
                             {editableMembers(editDraft.memberIds).map((member) => (
                               <label key={member.userId} className="flex items-center justify-between gap-3 rounded-md border border-line bg-white px-3 py-2 text-sm">
@@ -443,33 +475,45 @@ export default function ExpensesPage() {
                         {isEditing ? (
                           <div className="flex flex-wrap gap-2">
                             <button
-                              className="btn-primary"
+                              aria-label="সেভ"
+                              className="inline-grid h-9 w-9 place-items-center rounded-lg bg-river text-white shadow-sm transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50"
                               disabled={updateMutation.isPending || editDraft.memberIds.length === 0}
+                              title="সেভ"
                               type="button"
                               onClick={saveInlineEdit}
                             >
                               <Check size={15} aria-hidden="true" />
-                              সেভ
                             </button>
-                            <button className="btn-secondary" type="button" onClick={cancelInlineEdit}>
+                            <button
+                              aria-label="বাতিল"
+                              className="inline-grid h-9 w-9 place-items-center rounded-lg border border-line bg-white text-ink shadow-sm transition hover:bg-slate-50"
+                              title="বাতিল"
+                              type="button"
+                              onClick={cancelInlineEdit}
+                            >
                               <X size={15} aria-hidden="true" />
-                              বাতিল
                             </button>
                           </div>
                         ) : (
                           <div className="flex flex-wrap gap-2">
-                            <button className="btn-secondary" type="button" onClick={() => startInlineEdit(expense)}>
+                            <button
+                              aria-label="এডিট"
+                              className="inline-grid h-9 w-9 place-items-center rounded-lg border border-line bg-white text-ink shadow-sm transition hover:bg-cyan-50 hover:text-river"
+                              title="এডিট"
+                              type="button"
+                              onClick={() => startInlineEdit(expense)}
+                            >
                               <Pencil size={15} aria-hidden="true" />
-                              এডিট
                             </button>
                             <button
-                              className="btn-danger"
+                              aria-label="ডিলিট"
+                              className="inline-grid h-9 w-9 place-items-center rounded-lg bg-ember text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
                               disabled={deleteMutation.isPending}
+                              title="ডিলিট"
                               type="button"
                               onClick={() => setDeleteTarget(expense)}
                             >
                               <Trash2 size={15} aria-hidden="true" />
-                              ডিলিট
                             </button>
                           </div>
                         )}

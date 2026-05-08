@@ -44,6 +44,7 @@ export type Tour = {
   startDate: string;
   endDate?: string | null;
   description?: string | null;
+  requirements?: string[];
   estimatedBudget?: string | null;
   status: TourStatus;
   createdAt: string;
@@ -140,7 +141,7 @@ export type ReportMember = {
 };
 
 export type TourReport = {
-  tour: Pick<Tour, 'id' | 'title' | 'startLocation' | 'destination' | 'estimatedBudget' | 'status' | 'startDate' | 'endDate'>;
+  tour: Pick<Tour, 'id' | 'title' | 'startLocation' | 'destination' | 'requirements' | 'estimatedBudget' | 'status' | 'startDate' | 'endDate'>;
   summary: {
     totalExpense: string;
     totalFuelCost: string;

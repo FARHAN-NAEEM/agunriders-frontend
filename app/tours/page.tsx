@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -113,16 +113,26 @@ export default function ToursPage() {
                     </td>
                     {session.user.role === 'ADMIN' ? (
                       <td className="table-cell" data-label="অ্যাকশন">
-                        <button
-                          aria-label={`${tour.title} ডিলিট করুন`}
-                          className="inline-grid h-8 w-8 place-items-center rounded-lg bg-ember text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={deleteMutation.isPending}
-                          type="button"
-                          title="ডিলিট"
-                          onClick={() => setDeleteTarget(tour)}
-                        >
-                          <Trash2 size={15} aria-hidden="true" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            aria-label={`${tour.title} এডিট করুন`}
+                            className="inline-grid h-8 w-8 place-items-center rounded-lg bg-white text-river shadow-sm ring-1 ring-line transition hover:bg-teal-50 hover:ring-river"
+                            href={`/tours/${tour.id}/edit`}
+                            title="এডিট"
+                          >
+                            <Pencil size={15} aria-hidden="true" />
+                          </Link>
+                          <button
+                            aria-label={`${tour.title} ডিলিট করুন`}
+                            className="inline-grid h-8 w-8 place-items-center rounded-lg bg-ember text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={deleteMutation.isPending}
+                            type="button"
+                            title="ডিলিট"
+                            onClick={() => setDeleteTarget(tour)}
+                          >
+                            <Trash2 size={15} aria-hidden="true" />
+                          </button>
+                        </div>
                       </td>
                     ) : null}
                   </tr>

@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
-import { clearSession, getSession } from '@/lib/api';
+import { apiFetch, clearSession, getSession } from '@/lib/api';
 import { bnLabel, statusLabel } from '@/lib/i18n';
 import type { Session } from '@/lib/types';
 
@@ -34,9 +34,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  function logout() {
-    clearSession();
-    router.push('/login');
+  async function logout() {
+    const currentSession = getSession();
+
+    try {
+      if (currentSession?.refreshToken) {
+        await apiFetch('/auth/logout', {
+          method: 'POST',
+        });
+      }
+    } finally {
+      clearSession();
+      router.push('/login');
+    }
   }
 
   if (isAuthPage) {

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Camera, History, Pencil, Save, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ChangeEvent, useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { apiFetch, dateText, routeText } from '@/lib/api';
@@ -19,6 +19,10 @@ type MemberForm = {
   avatarUrl: string;
   drivingLicenseNumber: string;
   motorcycleRegistrationNumber: string;
+  registrationMetro: string;
+  registrationSeries: string;
+  registrationFirstDigits: string;
+  registrationLastDigits: string;
   motorcycleModel: string;
   status: string;
 };
@@ -30,9 +34,25 @@ const emptyForm: MemberForm = {
   avatarUrl: '',
   drivingLicenseNumber: '',
   motorcycleRegistrationNumber: '',
+  registrationMetro: 'ঢাকা মেট্রো',
+  registrationSeries: 'LA',
+  registrationFirstDigits: '',
+  registrationLastDigits: '',
   motorcycleModel: '',
   status: 'ACTIVE',
 };
+
+const metroOptions = [
+  'ঢাকা মেট্রো',
+  'চট্টগ্রাম মেট্রো',
+  'রাজশাহী মেট্রো',
+  'সিলেট মেট্রো',
+  'খুলনা মেট্রো',
+  'ময়মনসিংহ মেট্রো',
+  'রংপুর মেট্রো',
+];
+
+const registrationSeriesOptions = ['LA', 'HA'];
 
 function initials(name: string) {
   return name
@@ -48,6 +68,56 @@ function valueOrUnset(value?: string | null) {
   return value || 'সেট করা হয়নি';
 }
 
+function parseRegistrationNumber(value?: string | null) {
+  const match = /^(.+)-(LA|HA)-(\d{2})-(\d{4})$/.exec(value?.trim() ?? '');
+
+  if (!match) {
+    return {
+      registrationMetro: 'ঢাকা মেট্রো',
+      registrationSeries: 'LA',
+      registrationFirstDigits: '',
+      registrationLastDigits: '',
+    };
+  }
+
+  return {
+    registrationMetro: metroOptions.includes(match[1]) ? match[1] : 'ঢাকা মেট্রো',
+    registrationSeries: match[2],
+    registrationFirstDigits: match[3],
+    registrationLastDigits: match[4],
+  };
+}
+
+function buildRegistrationNumber(form: MemberForm) {
+  if (form.registrationFirstDigits.length === 2 && form.registrationLastDigits.length === 4) {
+    return `${form.registrationMetro}-${form.registrationSeries}-${form.registrationFirstDigits}-${form.registrationLastDigits}`;
+  }
+
+  return form.registrationFirstDigits || form.registrationLastDigits
+    ? ''
+    : form.motorcycleRegistrationNumber;
+}
+
+function toUpdatePayload(form: MemberForm) {
+  const {
+    registrationMetro,
+    registrationSeries,
+    registrationFirstDigits,
+    registrationLastDigits,
+    ...payload
+  } = form;
+
+  void registrationMetro;
+  void registrationSeries;
+  void registrationFirstDigits;
+  void registrationLastDigits;
+
+  return {
+    ...payload,
+    motorcycleRegistrationNumber: buildRegistrationNumber(form),
+  };
+}
+
 export default function MemberProfilePage() {
   const params = useParams<{ memberId: string }>();
   const memberId = params.memberId;
@@ -58,6 +128,8 @@ export default function MemberProfilePage() {
   const [form, setForm] = useState<MemberForm>(emptyForm);
   const [imageError, setImageError] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingStatusForm, setPendingStatusForm] = useState<MemberForm | null>(null);
+  const registrationLastInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = session?.user.role === 'ADMIN';
   const { data: member, isLoading } = useQuery({
     queryKey: ['member', memberId],
@@ -68,10 +140,11 @@ export default function MemberProfilePage() {
     mutationFn: (values: MemberForm) =>
       apiFetch<User>(`/users/${memberId}`, {
         method: 'PATCH',
-        body: JSON.stringify(values),
-      }),
+        body: JSON.stringify(toUpdatePayload(values)),
+    }),
     onSuccess: (updated) => {
       setEditing(false);
+      setPendingStatusForm(null);
       void queryClient.invalidateQueries({ queryKey: ['member', memberId] });
       void queryClient.invalidateQueries({ queryKey: ['system-members'] });
       setForm(fromMember(updated));
@@ -105,6 +178,8 @@ export default function MemberProfilePage() {
   }
 
   function fromMember(item: User): MemberForm {
+    const registration = parseRegistrationNumber(item.motorcycleRegistrationNumber);
+
     return {
       name: item.name ?? '',
       email: item.email ?? '',
@@ -112,6 +187,7 @@ export default function MemberProfilePage() {
       avatarUrl: item.avatarUrl ?? '',
       drivingLicenseNumber: item.drivingLicenseNumber ?? '',
       motorcycleRegistrationNumber: item.motorcycleRegistrationNumber ?? '',
+      ...registration,
       motorcycleModel: item.motorcycleModel ?? '',
       status: item.status ?? 'ACTIVE',
     };
@@ -119,6 +195,37 @@ export default function MemberProfilePage() {
 
   function setField(field: keyof MemberForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function setDigitField(field: 'registrationFirstDigits' | 'registrationLastDigits', value: string) {
+    const maxLength = field === 'registrationFirstDigits' ? 2 : 4;
+    const digits = value.replace(/\D/g, '').slice(0, maxLength);
+    setField(field, digits);
+
+    if (field === 'registrationFirstDigits' && digits.length === 2) {
+      registrationLastInputRef.current?.focus();
+    }
+  }
+
+  function saveMember() {
+    if (!member) {
+      return;
+    }
+
+    if (form.status !== (member.status ?? 'ACTIVE')) {
+      setPendingStatusForm(form);
+      return;
+    }
+
+    updateMutation.mutate(form);
+  }
+
+  function confirmStatusChange() {
+    if (!pendingStatusForm) {
+      return;
+    }
+
+    updateMutation.mutate(pendingStatusForm);
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -189,7 +296,7 @@ export default function MemberProfilePage() {
             </Link>
             {editing ? (
               <>
-                <button className="btn-primary" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate(form)} type="button">
+                <button className="btn-primary" disabled={updateMutation.isPending} onClick={saveMember} type="button">
                   <Save size={16} aria-hidden="true" />
                   সেভ
                 </button>
@@ -204,7 +311,7 @@ export default function MemberProfilePage() {
                 এডিট
               </button>
             )}
-            <button className="btn-danger" disabled={deleteMutation.isPending} onClick={() => setDeleteDialogOpen(true)} type="button">
+            <button className="btn-danger" disabled={deleteMutation.isPending || member.status !== 'INACTIVE'} onClick={() => setDeleteDialogOpen(true)} type="button">
               <Trash2 size={16} aria-hidden="true" />
               ডিলিট
             </button>
@@ -256,13 +363,52 @@ export default function MemberProfilePage() {
                 onChange={(event) => setField('drivingLicenseNumber', event.target.value)}
               />
             </label>
-            <label className="block space-y-1">
+            <label className="block space-y-1 sm:col-span-2">
               <span className="label">মোটরসাইকেল রেজিস্ট্রেশন নাম্বার</span>
-              <input
-                className="field"
-                value={form.motorcycleRegistrationNumber}
-                onChange={(event) => setField('motorcycleRegistrationNumber', event.target.value)}
-              />
+              <div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1.3fr)_88px_76px_auto_112px]">
+                <select
+                  className="field"
+                  value={form.registrationMetro}
+                  onChange={(event) => setField('registrationMetro', event.target.value)}
+                >
+                  {metroOptions.map((metro) => (
+                    <option key={metro} value={metro}>
+                      {metro}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="field"
+                  value={form.registrationSeries}
+                  onChange={(event) => setField('registrationSeries', event.target.value)}
+                >
+                  {registrationSeriesOptions.map((series) => (
+                    <option key={series} value={series}>
+                      {series}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="field text-center"
+                  inputMode="numeric"
+                  maxLength={2}
+                  pattern="[0-9]*"
+                  placeholder="12"
+                  value={form.registrationFirstDigits}
+                  onChange={(event) => setDigitField('registrationFirstDigits', event.target.value)}
+                />
+                <span className="hidden text-center text-lg font-black text-slate-400 sm:block">-</span>
+                <input
+                  ref={registrationLastInputRef}
+                  className="field text-center"
+                  inputMode="numeric"
+                  maxLength={4}
+                  pattern="[0-9]*"
+                  placeholder="3456"
+                  value={form.registrationLastDigits}
+                  onChange={(event) => setDigitField('registrationLastDigits', event.target.value)}
+                />
+              </div>
             </label>
             <label className="block space-y-1 sm:col-span-2">
               <span className="label">মোটরসাইকেলের মডেল</span>
@@ -351,6 +497,24 @@ export default function MemberProfilePage() {
           <p className="p-4 text-sm text-slate-600">এই মেম্বার এখনও কোনো ট্যুরে যুক্ত হয়নি।</p>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(pendingStatusForm)}
+        title={pendingStatusForm?.status === 'INACTIVE' ? 'মেম্বার ইনঅ্যাক্টিভ করবেন?' : 'মেম্বার অ্যাক্টিভ করবেন?'}
+        message={
+          <>
+            <strong>{member.name}</strong>{' '}
+            {pendingStatusForm?.status === 'INACTIVE'
+              ? 'ইনঅ্যাক্টিভ করলে এই মেম্বার সকল অ্যাক্টিভ ট্যুর থেকে অটোমেটিক ইনঅ্যাক্টিভ হয়ে যাবে।'
+              : 'অ্যাক্টিভ করলে মেম্বার আবার সিস্টেমে অ্যাক্টিভ হিসেবে দেখা যাবে।'}
+          </>
+        }
+        confirmLabel={pendingStatusForm?.status === 'INACTIVE' ? 'হ্যাঁ, ইনঅ্যাক্টিভ করুন' : 'হ্যাঁ, অ্যাক্টিভ করুন'}
+        loadingLabel="আপডেট হচ্ছে..."
+        loading={updateMutation.isPending}
+        onCancel={() => setPendingStatusForm(null)}
+        onConfirm={confirmStatusChange}
+      />
 
       <ConfirmDialog
         open={deleteDialogOpen}

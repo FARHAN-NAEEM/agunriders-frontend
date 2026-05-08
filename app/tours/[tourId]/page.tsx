@@ -1,7 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Fuel, ReceiptText, Users } from 'lucide-react';
+import { CalendarDays, Fuel, Pencil, ReceiptText, Users } from 'lucide-react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
@@ -55,6 +56,16 @@ export default function TourOverviewPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {tour ? <StatusBadge value={tour.status} /> : null}
+          {session.user.role === 'ADMIN' && tour ? (
+            <Link
+              aria-label={`${tour.title} এডিট করুন`}
+              className="inline-grid h-10 w-10 place-items-center rounded-lg bg-white text-river shadow-sm ring-1 ring-line transition hover:bg-teal-50 hover:ring-river"
+              href={`/tours/${tour.id}/edit`}
+              title="এডিট"
+            >
+              <Pencil size={17} aria-hidden="true" />
+            </Link>
+          ) : null}
           {session.user.role === 'ADMIN' && tour ? (
             <select
               className="field w-40"
@@ -115,6 +126,18 @@ export default function TourOverviewPage() {
             <dd className="mt-1 font-semibold">{money(report?.summary.totalLoan)}</dd>
           </div>
         </dl>
+        {tour?.requirements?.length ? (
+          <div className="mt-5">
+            <h3 className="label">রিকোয়ারমেন্ট</h3>
+            <ul className="mt-2 space-y-2">
+              {tour.requirements.map((requirement) => (
+                <li key={requirement} className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                  {requirement}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {tour?.description ? <p className="mt-4 text-sm leading-6 text-slate-700">{tour.description}</p> : null}
       </section>
     </div>

@@ -2,9 +2,10 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Save, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { apiFetch } from '@/lib/api';
@@ -26,6 +27,7 @@ type FormData = z.infer<typeof schema>;
 export default function CreateTourPage() {
   const router = useRouter();
   const { session, ready } = useSessionGuard();
+  const [requirements, setRequirements] = useState(['']);
   const {
     register,
     handleSubmit,
@@ -37,10 +39,25 @@ export default function CreateTourPage() {
     mutationFn: (values: FormData) =>
       apiFetch<Tour>('/tours', {
         method: 'POST',
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          requirements: requirements.map((item) => item.trim()).filter(Boolean),
+        }),
       }),
     onSuccess: (tour) => router.push(`/tours/${tour.id}`),
   });
+
+  function updateRequirement(index: number, value: string) {
+    setRequirements((current) => current.map((item, itemIndex) => (itemIndex === index ? value : item)));
+  }
+
+  function addRequirement() {
+    setRequirements((current) => [...current, '']);
+  }
+
+  function removeRequirement(index: number) {
+    setRequirements((current) => (current.length === 1 ? [''] : current.filter((_, itemIndex) => itemIndex !== index)));
+  }
 
   if (!ready || !session) {
     return null;
@@ -88,6 +105,36 @@ export default function CreateTourPage() {
             <span className="label">শেষ তারিখ</span>
             <input className="field" type="date" {...register('endDate')} />
           </label>
+
+          <div className="space-y-2 sm:col-span-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="label">রিকোয়ারমেন্ট</span>
+              <button className="btn-secondary" type="button" onClick={addRequirement} title="রিকোয়ারমেন্ট যোগ করুন">
+                <Plus size={16} aria-hidden="true" />
+                যোগ করুন
+              </button>
+            </div>
+            <div className="space-y-2">
+              {requirements.map((requirement, index) => (
+                <div key={index} className="grid grid-cols-[1fr_auto] items-center gap-2">
+                  <input
+                    className="field"
+                    placeholder={`রিকোয়ারমেন্ট ${index + 1}`}
+                    value={requirement}
+                    onChange={(event) => updateRequirement(index, event.target.value)}
+                  />
+                  <button
+                    aria-label="রিকোয়ারমেন্ট বাদ দিন"
+                    className="inline-grid h-11 w-11 place-items-center rounded-lg border border-line bg-white text-slate-600 transition hover:bg-red-50 hover:text-ember"
+                    type="button"
+                    onClick={() => removeRequirement(index)}
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <label className="block space-y-1 sm:col-span-2">
             <span className="label">বর্ণনা</span>

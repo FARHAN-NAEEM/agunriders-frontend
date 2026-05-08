@@ -2,6 +2,7 @@ import type { Session } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 const SESSION_KEY = 'agunriders.session';
+let refreshSessionRequest: Promise<Session | null> | null = null;
 
 type ApiOptions = RequestInit & {
   skipAuth?: boolean;
@@ -36,8 +37,7 @@ export function clearSession() {
   window.dispatchEvent(new Event('agunriders-session'));
 }
 
-export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const session = getSession();
+function buildHeaders(options: ApiOptions, session: Session | null) {
   const headers = new Headers(options.headers);
 
   if (!headers.has('Content-Type') && options.body) {
@@ -48,10 +48,63 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     headers.set('Authorization', `Bearer ${session.accessToken}`);
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  return headers;
+}
+
+function sendApiRequest(path: string, options: ApiOptions, session: Session | null) {
+  return fetch(`${API_BASE}${path}`, {
     ...options,
-    headers,
+    headers: buildHeaders(options, session),
   });
+}
+
+async function requestSessionRefresh(session: Session) {
+  try {
+    const response = await fetch(`${API_BASE}/auth/refresh-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: session.refreshToken }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const nextSession = (await response.json()) as Session;
+    setSession(nextSession);
+    return nextSession;
+  } catch {
+    return null;
+  }
+}
+
+async function refreshSession(session: Session) {
+  if (!refreshSessionRequest) {
+    refreshSessionRequest = requestSessionRefresh(session).finally(() => {
+      refreshSessionRequest = null;
+    });
+  }
+
+  return refreshSessionRequest;
+}
+
+export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const session = getSession();
+  let response = await sendApiRequest(path, options, session);
+
+  if (response.status === 401 && !options.skipAuth) {
+    const latestSession = getSession();
+    const nextSession =
+      latestSession?.accessToken && latestSession.accessToken !== session?.accessToken
+        ? latestSession
+        : latestSession?.refreshToken
+          ? await refreshSession(latestSession)
+          : null;
+
+    if (nextSession) {
+      response = await sendApiRequest(path, options, nextSession);
+    }
+  }
 
   if (!response.ok) {
     let message = `রিকোয়েস্ট ব্যর্থ হয়েছে (${response.status})`;

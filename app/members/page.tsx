@@ -21,10 +21,19 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+function hasBikeInfo(member: User) {
+  return Boolean(
+    member.motorcycleModel ||
+      member.motorcycleRegistrationNumber ||
+      member.drivingLicenseNumber,
+  );
+}
+
 export default function MembersPage() {
   const { session, ready } = useSessionGuard();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const isAdmin = session?.user.role === 'ADMIN';
   const { data: members = [], isLoading } = useQuery({
@@ -39,12 +48,21 @@ export default function MembersPage() {
 
   const filteredMembers = useMemo(() => {
     const keyword = search.trim().toLowerCase();
+    const byStatus = members.filter((member) => {
+      const status = member.status ?? 'ACTIVE';
+
+      if (statusFilter === 'ALL') {
+        return true;
+      }
+
+      return statusFilter === 'ACTIVE' ? status !== 'INACTIVE' : status === 'INACTIVE';
+    });
 
     if (!keyword) {
-      return members;
+      return byStatus;
     }
 
-    return members.filter((member) =>
+    return byStatus.filter((member) =>
       [
         member.name,
         member.email,
@@ -54,7 +72,7 @@ export default function MembersPage() {
         member.motorcycleModel ?? '',
       ].some((value) => value.toLowerCase().includes(keyword)),
     );
-  }, [members, search]);
+  }, [members, search, statusFilter]);
 
   if (!ready || !session) {
     return null;
@@ -93,6 +111,11 @@ export default function MembersPage() {
           label="অ্যাক্টিভ মেম্বার"
           value={members.filter((member) => member.status !== 'INACTIVE').length}
         />
+        <StatCard
+          icon={<UsersRound size={20} />}
+          label="ইনঅ্যাক্টিভ মেম্বার"
+          value={members.filter((member) => member.status === 'INACTIVE').length}
+        />
       </div>
 
       <section className="surface overflow-hidden">
@@ -114,6 +137,15 @@ export default function MembersPage() {
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
+          <select
+            className="field w-full max-w-48"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+          >
+            <option value="ALL">সব স্ট্যাটাস</option>
+            <option value="ACTIVE">অ্যাক্টিভ</option>
+            <option value="INACTIVE">ইনঅ্যাক্টিভ</option>
+          </select>
         </div>
 
         {isLoading ? (
@@ -124,13 +156,11 @@ export default function MembersPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1220px] border-collapse">
+            <table className="w-full min-w-[1040px] border-collapse">
               <thead>
                 <tr className="table-head">
                   <th className="px-4 py-3">মেম্বার</th>
-                  <th className="px-4 py-3">যোগাযোগ</th>
-                  <th className="px-4 py-3">লাইসেন্স</th>
-                  <th className="px-4 py-3">মোটরসাইকেল</th>
+                  <th className="px-4 py-3">বাইকের তথ্য</th>
                   <th className="px-4 py-3">স্ট্যাটাস</th>
                   <th className="px-4 py-3">যুক্ত ট্যুর</th>
                   <th className="px-4 py-3">রেজিস্ট্রেশন</th>
@@ -152,20 +182,16 @@ export default function MembersPage() {
                         <span>{member.name}</span>
                       </Link>
                     </td>
-                    <td className="table-cell" data-label="যোগাযোগ">
-                      <div className="space-y-1">
-                        <p>{member.email}</p>
-                        <p className="text-sm text-slate-500">{member.phone || 'ফোন সেট করা হয়নি'}</p>
-                      </div>
-                    </td>
-                    <td className="table-cell" data-label="লাইসেন্স">{member.drivingLicenseNumber || 'সেট করা হয়নি'}</td>
-                    <td className="table-cell" data-label="মোটরসাইকেল">
-                      <div className="space-y-1">
-                        <p>{member.motorcycleModel || 'মডেল সেট করা হয়নি'}</p>
-                        <p className="text-sm text-slate-500">
-                          {member.motorcycleRegistrationNumber || 'রেজিস্ট্রেশন সেট করা হয়নি'}
-                        </p>
-                      </div>
+                    <td className="table-cell" data-label="বাইকের তথ্য">
+                      {hasBikeInfo(member) ? (
+                        <div className="space-y-1">
+                          <p>{member.motorcycleModel || 'N/A'}</p>
+                          <p className="text-sm text-slate-500">{member.motorcycleRegistrationNumber || 'N/A'}</p>
+                          <p className="text-sm text-slate-500">{member.drivingLicenseNumber || 'N/A'}</p>
+                        </div>
+                      ) : (
+                        'N/A'
+                      )}
                     </td>
                     <td className="table-cell" data-label="স্ট্যাটাস">
                       <StatusBadge value={member.status ?? 'ACTIVE'} />
@@ -202,7 +228,7 @@ export default function MembersPage() {
                         <button
                           aria-label={`${member.name} ডিলিট করুন`}
                           className="inline-grid h-8 w-8 place-items-center rounded-lg bg-ember text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={deleteMutation.isPending}
+                          disabled={deleteMutation.isPending || member.status !== 'INACTIVE'}
                           type="button"
                           title="ডিলিট"
                           onClick={() => setDeleteTarget(member)}
